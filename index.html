@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Maps App</title>
+  <link rel="stylesheet" href="/styles.css">
     <style>
       /* Simple InfoWindow styles */
       .user-marker strong { color: #1e88e5; }
@@ -55,9 +56,16 @@
             </div>
           </div>
           <hr />
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px">
+            <input id="search-box" placeholder="Search address or place" aria-label="Search address" style="flex:1" />
+            <button id="search-go" aria-label="Search">Go</button>
+          </div>
           <div>
             <button id="export-data">Export markers</button>
+            <button id="export-geojson" style="margin-left:8px">Export GeoJSON</button>
+            <button id="export-csv" style="margin-left:8px">Export CSV</button>
             <button id="save-project" style="margin-left:8px">Save project</button>
+            <button id="load-project" style="margin-left:8px">Load project</button>
             <input id="import-file" type="file" accept="application/json" style="display:block; margin-top:8px" />
             <!-- Status area populated during imports -->
             <div id="import-container" style="margin-top:6px">

@@ -1,0 +1,13 @@
+:root{
+  --sidebar-width: 300px;
+  --accent: #1e88e5;
+}
+body{ margin:0; font-family: Arial, Helvetica, sans-serif; }
+#map{ height:100vh; width: calc(100% - var(--sidebar-width)); margin-left: var(--sidebar-width); }
+aside#sidebar{ width:var(--sidebar-width); }
+.modal-backdrop{ display:none }
+.modal-backdrop[style*="display:flex"]{ display:flex }
+@media(max-width:700px){
+  #map{ width:100%; margin-left:0; }
+  aside#sidebar{ position:relative; width:100%; height:auto; }
+}

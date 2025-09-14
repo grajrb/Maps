@@ -18,6 +18,8 @@ export class CustomMap {
   private markerCluster?: MarkerClusterer | null = null;
   // metadata registry maps marker -> arbitrary metadata (address, avatarUrl, origin type, etc.)
   private meta = new Map<google.maps.Marker, any>();
+  // Simple event hooks for plugins: event -> listeners
+  private hooks: Record<string, Array<(...args: any[]) => void>> = {};
 
   constructor(elementId: string, center: { lat: number; lng: number } = { lat: 0, lng: 0 }, zoom = 1) {
     const el = document.getElementById(elementId);
@@ -84,8 +86,14 @@ export class CustomMap {
     } else {
       this.markerCluster.addMarker(marker);
     }
+    // notify hooks
+    (this.hooks['markerAdded'] || []).forEach(fn => { try { fn(marker, mappable); } catch(e) {} });
     return marker;
   }
+
+  // Hook API
+  on(ev: string, fn: (...args: any[]) => void) { this.hooks[ev] = this.hooks[ev] || []; this.hooks[ev].push(fn); }
+  off(ev: string, fn: (...args: any[]) => void) { this.hooks[ev] = (this.hooks[ev] || []).filter(f => f !== fn); }
 
   // Metadata helpers
   setMarkerMeta(marker: google.maps.Marker, data: any) {

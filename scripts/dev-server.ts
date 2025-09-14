@@ -51,8 +51,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
     const data = readFileSync(fsPath, 'utf8');
     const ext = extname(fsPath);
-    const contentType = ext === '.html' ? 'text/html' : ext === '.js' ? 'application/javascript' : 'text/plain';
-    res.writeHead(200, { 'Content-Type': contentType });
+    const contentType = ext === '.html' ? 'text/html' : ext === '.js' ? 'application/javascript' : ext === '.css' ? 'text/css' : 'text/plain';
+    // add cache headers for static assets
+    const headers: any = { 'Content-Type': contentType };
+    if (ext === '.js' || ext === '.css') {
+      headers['Cache-Control'] = 'public, max-age=0, must-revalidate';
+    }
+    res.writeHead(200, headers);
     res.end(data);
   } catch (err) {
     res.writeHead(404, { 'Content-Type': 'text/plain' });

@@ -228,6 +228,79 @@ function createMap() {
       URL.revokeObjectURL(url);
     });
   }
+  const exportGeoJSONBtn = document.getElementById('export-geojson') as HTMLButtonElement | null;
+  const exportCsvBtn = document.getElementById('export-csv') as HTMLButtonElement | null;
+  const loadProjectBtn = document.getElementById('load-project') as HTMLButtonElement | null;
+  const searchBox = document.getElementById('search-box') as HTMLInputElement | null;
+  const searchGo = document.getElementById('search-go') as HTMLButtonElement | null;
+
+  const toCSV = (arr: any[]) => {
+    if (!arr.length) return '';
+    const keys = Object.keys(arr[0]);
+    const lines = [keys.join(',')];
+    for (const r of arr) lines.push(keys.map(k => JSON.stringify(r[k] ?? '')).join(','));
+    return lines.join('\n');
+  };
+
+  if (exportGeoJSONBtn) {
+    exportGeoJSONBtn.addEventListener('click', () => {
+      const markers = (customMap as any).markers as google.maps.Marker[];
+      const featureCollection = { type: 'FeatureCollection', features: markers.map((m) => { const p = m.getPosition(); const meta = (customMap as any).getMarkerMeta(m) || {}; return { type: 'Feature', properties: { title: m.getTitle(), ...meta }, geometry: p ? { type: 'Point', coordinates: [p.lng(), p.lat()] } : null }; }) };
+      const blob = new Blob([JSON.stringify(featureCollection, null, 2)], { type: 'application/geo+json' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'markers.geojson'; a.click(); URL.revokeObjectURL(url);
+    });
+  }
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener('click', () => {
+      const markers = (customMap as any).markers as google.maps.Marker[];
+      const rows = markers.map(m => { const p = m.getPosition(); const meta = (customMap as any).getMarkerMeta(m) || {}; return { title: m.getTitle(), lat: p?.lat(), lng: p?.lng(), type: meta.type, address: meta.address, avatarUrl: meta.avatarUrl }; });
+      const csv = toCSV(rows);
+      const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'markers.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+  }
+
+  if (loadProjectBtn) {
+    loadProjectBtn.addEventListener('click', () => {
+      try {
+        const raw = localStorage.getItem('map.lastExport');
+        if (!raw) { showToast('No saved project found', true); return; }
+        const parsed = JSON.parse(raw);
+        // reuse import logic: create objects and add markers
+        parsed.forEach((item: any) => {
+          if (item.type === 'User') {
+            const u = User.fromJSON({ name: item.title, location: { lat: item.position?.lat || 0, long: item.position?.lng || 0 }, address: item.address, avatarUrl: item.avatarUrl });
+            const m = customMap.addMarker(u as any);
+            if (m) customMap.setMarkerMeta(m, { address: u.address, avatarUrl: u.avatarUrl, type: 'User' });
+          } else if (item.type === 'Company') {
+            const c = Company.fromJSON({ name: item.title, location: { lat: item.position?.lat || 0, long: item.position?.lng || 0 }, address: item.address, avatarUrl: item.avatarUrl });
+            const m = customMap.addMarker(c as any);
+            if (m) customMap.setMarkerMeta(m, { address: c.address, avatarUrl: c.avatarUrl, type: 'Company' });
+          }
+        });
+        refreshList();
+      } catch (e) { showToast('Failed to load project', true); }
+    });
+  }
+
+  if (searchGo && searchBox) {
+    searchGo.addEventListener('click', () => {
+      const q = searchBox.value.trim();
+      if (!q) return;
+      if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Geocoder) {
+        const geocoder = new (window as any).google.maps.Geocoder();
+        geocoder.geocode({ address: q }, (results: any) => {
+          if (!results || !results[0]) { showToast('No results found', true); return; }
+          const loc = results[0].geometry.location;
+          const u = new User(q, { lat: loc.lat(), long: loc.lng() });
+          const m = customMap.addMarker(u as any);
+          if (m) customMap.setMarkerMeta(m, { address: results[0].formatted_address || '', avatarUrl: u.avatarUrl, type: 'User' });
+          refreshList();
+        });
+      } else {
+        showToast('Geocoding not available (Maps API not loaded)', true);
+      }
+    });
+  }
     if (saveProjectBtn) {
       saveProjectBtn.addEventListener('click', () => {
         try {
