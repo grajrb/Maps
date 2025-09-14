@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Maps App</title>
+    <style>
+      /* Simple InfoWindow styles */
+      .user-marker strong { color: #1e88e5; }
+      .company-marker strong { color: #e53935; }
+
+      .info-card { display:flex; gap:8px; align-items:center; }
+      .info-avatar { width:48px; height:48px; border-radius:50%; background:#ddd; display:inline-block; flex-shrink:0 }
+      .info-body { font-family: Arial, Helvetica, sans-serif; }
+      .info-actions { margin-top:6px; }
+      .info-actions button { margin-right:6px; }
+
+      /* Small control box */
+      .map-controls {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(255,255,255,0.95);
+        padding: 8px 12px;
+        border-radius: 6px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        font-family: Arial, Helvetica, sans-serif;
+        z-index: 10;
+      }
+      .map-controls label { display: block; font-size: 14px; margin-bottom: 4px }
+        /* Modal editor */
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:9998 }
+        .modal { background:#fff; padding:12px; border-radius:8px; width:360px; box-shadow:0 6px 24px rgba(0,0,0,0.3) }
+        .modal h3 { margin:0 0 8px 0 }
+        .avatar-preview { width:64px; height:64px; border-radius:8px; background:#eee; background-size:cover; background-position:center }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar" style="width:260px; position:absolute; left:12px; top:12px; bottom:12px; background:rgba(255,255,255,0.98); padding:12px; overflow:auto; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.12); z-index:11">
+        <h2 style="margin:0 0 8px 0;">Markers</h2>
+        <div class="map-controls">
+          <label><input type="checkbox" id="toggle-users" checked /> Show users</label>
+          <label><input type="checkbox" id="toggle-companies" checked /> Show companies</label>
+          <hr />
+          <button id="fit-bounds">Center on visible</button>
+          <div style="margin-top:8px">
+            <button id="start-circle">Draw filter circle</button>
+            <div id="circle-controls" style="margin-top:8px; display:none">
+              <div style="display:flex; gap:8px; align-items:center">
+                <div>Radius: <span id="circle-radius-readout">100 km</span></div>
+                <label style="font-size:12px; margin-left:6px"><input id="circle-unit-toggle" type="checkbox" /> show meters</label>
+              </div>
+              <input id="circle-radius-slider" type="range" min="0.1" max="2000" step="0.1" value="100" />
+            </div>
+          </div>
+          <hr />
+          <div>
+            <button id="export-data">Export markers</button>
+            <button id="save-project" style="margin-left:8px">Save project</button>
+            <input id="import-file" type="file" accept="application/json" style="display:block; margin-top:8px" />
+            <!-- Status area populated during imports -->
+            <div id="import-container" style="margin-top:6px">
+              <div id="import-status" style="font-size:12px;color:#444"></div>
+            </div>
+          </div>
+        </div>
+        <hr />
+        <div id="marker-list"></div>
+      </aside>
+      <div id="map" style="height: 500px; width: calc(100% - 300px); margin-left:300px;"></div>
+    <div id="toast" style="position:fixed; bottom:12px; right:12px; z-index:9999"></div>
+      <div id="modal-backdrop" class="modal-backdrop">
+        <div class="modal" role="dialog" aria-modal="true">
+          <h3>Edit marker</h3>
+          <div style="display:flex; gap:8px; align-items:center">
+            <div id="modal-avatar" class="avatar-preview"></div>
+            <div style="flex:1">
+              <input id="modal-title" placeholder="Title" style="width:100%" />
+              <input id="modal-address" placeholder="Address" style="width:100%; margin-top:6px" />
+              <input id="modal-avatar-url" placeholder="Avatar URL" style="width:100%; margin-top:6px" />
+            </div>
+          </div>
+          <div style="margin-top:8px; text-align:right"><button id="modal-save">Save</button> <button id="modal-cancel">Cancel</button></div>
+        </div>
+      </div>
+      <!-- Import preview / validation modal -->
+      <div id="import-preview-backdrop" class="modal-backdrop" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-preview-title">
+          <h3 id="import-preview-title">Import preview</h3>
+          <div id="import-preview-errors" style="max-height:180px; overflow:auto; font-size:13px; color:#900"></div>
+          <div id="import-preview-list" style="max-height:220px; overflow:auto; margin-top:8px; font-size:13px"></div>
+          <div style="margin-top:8px; text-align:right">
+            <button id="import-preview-cancel">Cancel</button>
+            <button id="import-preview-import" style="margin-left:8px">Import</button>
+            <button id="import-preview-dryrun" style="margin-left:8px">Dry-run</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Provide a safe stub for initMap so the Google callback won't fail if our module hasn't registered the real initializer yet -->
+    <script>
+      (function () {
+        // If Google calls initMap before the module runs, remember that and/or
+        // forward the call to the real initializer when it becomes available.
+        window._gmaps_init_ready = false;
+        window.initMap = function () {
+          if (window.__realInitMap) {
+            try { window.__realInitMap(); } catch (e) { console.error(e); }
+          } else {
+            window._gmaps_init_ready = true;
+          }
+        };
+      })();
+    </script>
+  <!-- Load environment helper then load Google Maps with injected key -->
+  <script src="/env.js"></script>
+  <script>
+    (function () {
+  const key = (window.__ENV && window.__ENV.MAPS_API_KEY) || '';
+      if (!key) {
+        console.warn('MAPS_API_KEY not set. Google Maps may not load. Set MAPS_API_KEY in your environment.');
+      }
+      const s = document.createElement('script');
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=initMap`;
+      s.async = true;
+      s.defer = true;
+      document.head.appendChild(s);
+    })();
+  </script>
+  <script type="module" src="./src/index.ts"></script>
+  </body>
+</html>
